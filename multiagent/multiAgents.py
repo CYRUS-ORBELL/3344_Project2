@@ -264,17 +264,92 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
         legal moves.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        def expectimax(state, depth, agentIndex):
+            if depth == 0 or state.isWin() or state.isLose():
+                return self.evaluationFunction(state)
+
+            if agentIndex == 0:  # Pacman — maximize
+                return max(
+                    expectimax(state.generateSuccessor(agentIndex, action), depth, 1)
+                    for action in state.getLegalActions(agentIndex)
+                )
+            else:  # Ghost — expectation (uniform random)
+                nextAgent = (agentIndex + 1) % state.getNumAgents()
+                newDepth = depth - 1 if nextAgent == 0 else depth
+                actions = state.getLegalActions(agentIndex)
+                return sum(
+                    expectimax(state.generateSuccessor(agentIndex, action), newDepth, nextAgent)
+                    for action in actions
+                ) / len(actions)
+
+        legalActions = gameState.getLegalActions(0)
+        scores = [expectimax(gameState.generateSuccessor(0, action), self.depth, 1)
+                  for action in legalActions]
+        bestScore = max(scores)
+        bestIndexes = [i for i in range(len(scores)) if scores[i] == bestScore]
+        return legalActions[random.choice(bestIndexes)]
 
 def betterEvaluationFunction(currentGameState: GameState):
     """
     Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
     evaluation function (question 5).
 
-    DESCRIPTION: <write something here so we know what you did>
+    DESCRIPTION:
+    This evaluation function considers the following features to score a state:
+    1. Current game score (base)
+    2. Distance to nearest food pellet (reciprocal reward — closer is better)
+    3. Number of food pellets remaining (penalized — fewer is better)
+    4. Ghost distances — penalize proximity to active ghosts, reward proximity
+       to scared ghosts (they are worth bonus points when eaten)
+    5. Number of capsules remaining (penalized — eating capsules enables ghost hunting)
     """
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    pos = currentGameState.getPacmanPosition()
+    food = currentGameState.getFood().asList()
+    ghostStates = currentGameState.getGhostStates()
+    scaredTimes = [ghostState.scaredTimer for ghostState in ghostStates]
+    capsules = currentGameState.getCapsules()
+
+    # Start with the actual game score as the base
+    score = currentGameState.getScore()
+
+    # --- Food reward ---
+    # Reward being close to the nearest food (reciprocal so closer = higher reward)
+    if food:
+        minFoodDist = min(manhattanDistance(pos, f) for f in food)
+        score += 10.0 / (minFoodDist + 1)
+
+    # Penalize having lots of food remaining — encourage Pacman to eat
+    score -= 4.0 * len(food)
+
+    # --- Ghost handling ---
+    for i, ghost in enumerate(ghostStates):
+        ghostPos = ghost.getPosition()
+        dist = manhattanDistance(pos, ghostPos)
+
+        if scaredTimes[i] > 0:
+            # Ghost is scared — chase it! Reward being close to scared ghosts
+            score += 200.0 / (dist + 1)
+        else:
+            # Ghost is active — avoid it heavily if nearby
+            if dist <= 1:
+                score -= 500.0   # imminent danger, strong deterrent
+            elif dist <= 3:
+                score -= 50.0 / (dist + 1)  # softer penalty at moderate distance
+            else:
+                score -= 5.0 / (dist + 1)   # slight awareness of distant ghosts
+
+    # --- Capsule reward ---
+    # Penalize capsules remaining — eating them turns ghosts scared (high value)
+    score -= 10.0 * len(capsules)
+
+    # Reward being close to a capsule if ghosts are nearby and not scared
+    activeGhosts = [g for i, g in enumerate(ghostStates) if scaredTimes[i] == 0]
+    if capsules and activeGhosts:
+        minCapsuleDist = min(manhattanDistance(pos, c) for c in capsules)
+        score += 5.0 / (minCapsuleDist + 1)
+
+    return score
 
 # Abbreviation
 better = betterEvaluationFunction
