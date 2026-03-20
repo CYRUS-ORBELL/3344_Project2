@@ -201,8 +201,52 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        def minimax(state, depth, agentIndex,alpha,beta):
+            if depth == 0 or state.isWin() or state.isLose():
+                return self.evaluationFunction(state)
+            
+            
+            if agentIndex == 0: # maximizes
+                value = float('-inf') #negative infinity
+                for action in state.getLegalActions(agentIndex):
+                    value = max(value,minimax(state.generateSuccessor(agentIndex, action), depth, 1, alpha,beta))
 
+                    if value > beta: # prune
+                        return value
+                    alpha = max(alpha,value)
+                return value
+            
+            
+            
+            else: # minimize
+                nextAgent = (agentIndex + 1) % state.getNumAgents()
+                newDepth = depth - 1 if nextAgent == 0 else depth
+                value = float('inf')
+               
+                for action in state.getLegalActions(agentIndex):
+                    value = min(value,minimax(state.generateSuccessor(agentIndex, action), newDepth, nextAgent,alpha,beta))
+                    if value < alpha:
+                        return value
+                    beta = min(beta,value)
+                return value
+            
+                
+        legalActions = gameState.getLegalActions(0)
+     
+        bestAction = None
+        alpha = float('-inf')
+        beta = float('inf')
+        for action in legalActions:
+            score = minimax(gameState.generateSuccessor(0, action), self.depth, 1,alpha,beta)
+            if score > alpha:
+                alpha= score
+                bestAction = action
+        
+        return bestAction
+    
+        
+
+    
 
 
 
